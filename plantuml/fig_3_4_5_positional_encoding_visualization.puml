@@ -1,0 +1,20 @@
+@startuml Fig_3_4_5_Positional_Encoding_Visualization
+title Fig 3.4.5: Positional Encoding (as implemented in SLM)\nLearned absolute positions — conceptual "heatmap"
+
+skinparam backgroundColor #FEFEFE
+
+rectangle "**nn.Embedding(block_size, n_embd)**\nlearnable matrix **P** ∈ ℝ^{T_max × d_model}\nrows = position 0 … T_max−1" as EMB
+
+rectangle "For sequence length **T**:\n**pos** = arange(0, T)\n**PE** = P[pos]  // (T, d_model)\nbroadcast + token embeddings" as LOOKUP
+EMB --> LOOKUP
+
+rectangle "Visualization idea\n(plot for thesis):\n— X-axis: dimension index **j** ∈ [0, d_model)\n— Y-axis: position **i** ∈ [0, T)\n— Color: P[i, j] after training\n(sinusoidal curves appear only if you\nuse fixed sin/cos PE; here expect\nirregular learned structure)" as VIZ
+LOOKUP .. VIZ : export / matplotlib
+
+note as N1
+  **Code reference:**\n  **x** = tok_emb(idx) + pos_emb(pos)\n  **block_size** = max context (e.g. 256)\n  This is **not** the fixed sinusoidal\n  Vaswani et al. formula; it matches\n  **GPT-2–style learned** positions.
+end note
+
+EMB .. N1
+
+@enduml

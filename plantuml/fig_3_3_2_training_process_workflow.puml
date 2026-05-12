@@ -1,0 +1,63 @@
+@startuml Fig_3_3_2_Training_Process_Workflow
+title Fig 3.3.2: Training Process Workflow (train.py + SLMConfig)
+
+skinparam backgroundColor #FEFEFE
+
+start
+
+:Load **SLMConfig**\n(seed, batch, block_size, LR schedule params);
+:Set device (CUDA/CPU),\n**autocast** dtype (e.g. bfloat16),\noptional **GradScaler** (float16);
+
+:Instantiate **BinDataLoader**\nmemmap **train.bin** / **val.bin**;
+:Build **SLM** model,\n**configure_optimizers** (AdamW);
+
+if (Resume from **checkpoints/best.pt**?) then (yes)
+  :Load model + optimizer state,\nrestore iter / best val loss;
+endif
+
+if (**torch.compile** enabled on CUDA?) then (yes)
+  :Wrap model (optional);
+endif
+
+repeat
+  :Compute **lr** = warmup +\ncosine decay (**get_lr**);
+
+  if (iter > 0 AND iter % **eval_interval**?) then (yes)
+    :**model.eval()** + **no_grad**;
+    :**estimate_loss** on train & val\n(**eval_iters** batches each);
+    :Append row to **logs/train_log.csv**;
+    if (val_loss improves?) then (yes)
+      :Save **checkpoints/best.pt**\n(raw state_dict, optimizer,\nconfig snapshot);
+    endif
+    :**model.train()**;
+  endif
+
+  :**optimizer.zero_grad**;
+  repeat :Micro-step 1..**gradient_accumulation_steps**;
+    :Sample batch (**x**, **y**)\nfrom train memmap;
+    :Forward **SLM(x, y)** → logits, **cross-entropy** loss;
+    :**loss / grad_accum_steps** → **backward**;
+    :Prefetch next batch;
+  repeat while (micro-steps done?)
+
+  if (**grad_clip** > 0?) then (yes)
+    :**clip_grad_norm_**;
+  endif
+
+  :**optimizer.step** (+ scaler step if float16);
+
+  if (iter % **log_interval**?) then (yes)
+    :Console log:\nloss, lr, ms/iter, tokens/sec;
+  endif
+
+  if (iter > 0 AND iter % 1000?) then (yes)
+    :Save **checkpoints/latest.pt**;
+  endif
+
+repeat while (iter <= **max_iters**?) is (no) not (yes)
+
+:Training complete\n(report best val loss);
+
+stop
+
+@enduml

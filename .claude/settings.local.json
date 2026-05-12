@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python prepare_data.py)",
+      "Bash(python -m pip install --upgrade pip)",
+      "Bash(python -m pip install -r requirements.txt)",
+      "Bash(python -c \"from pathlib import Path; d=Path\\('data'\\); [print\\(f'{p.name}: {p.stat\\(\\).st_size/1e6:.1f} MB, {p.stat\\(\\).st_size//2:,} tokens'\\) for p in sorted\\(d.glob\\('*.bin'\\)\\)]\")",
+      "Bash(python -c \"import torch, sys; print\\('python:', sys.version.split\\(\\)[0]\\); print\\('torch:', torch.__version__\\); print\\('cuda available:', torch.cuda.is_available\\(\\)\\); print\\('cuda build:', torch.version.cuda\\); print\\('device:', torch.cuda.get_device_name\\(0\\) if torch.cuda.is_available\\(\\) else 'N/A'\\)\")",
+      "Bash(python -m pip install --upgrade --index-url https://download.pytorch.org/whl/cu128 torch)",
+      "Bash(python *)",
+      "Bash(tee logs/train_run.log)",
+      "Bash(nvidia-smi *)",
+      "Bash(tasklist)"
+    ]
+  }
+}

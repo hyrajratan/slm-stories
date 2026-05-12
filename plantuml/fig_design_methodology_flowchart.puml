@@ -1,0 +1,35 @@
+@startuml Design_Methodology_Flowchart
+title Fig: Design Methodology (SLM Story Generator)\n— aligned with application-based LLM project lifecycle
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #E8F4FC
+  BorderColor #2E6DA4
+}
+
+|#E8F8E8|Problem & scope|
+start
+:Define goal:\nchild-friendly story generation\nfrom short prompts;
+:Constraints:\nGPU memory, latency,\nTinyStories domain;
+
+|#FFF8E8|Data engineering|
+:Acquire corpus:\nHugging Face **roneneldan/TinyStories**;
+:Tokenize with **GPT-2 BPE**\n(tiktoken), append **<|endoftext|>**\nper story boundary;
+:Emit **train.bin** / **val.bin**\n(uint16 memmaps);
+
+|#F0E8FF|Model design|
+:Decoder-only **GPT-style**\ntransformer (**SLM**);
+:Choices:\nRMSNorm, SwiGLU MLP,\nMHA + SDPA, weight tying,\nlearned positional embeddings;
+
+|#FFE8E8|Training & validation|
+:Optimize (**AdamW**, cosine+warmup,\ngrad accumulation, AMP);
+:Track **train/val loss**,\nsave **best.pt** / **latest.pt**;
+
+|#E8FFFF|Deployment & evaluation|
+:Inference:\n**generate.py** CLI or **server.py**\n(Gradio UI);
+:Sample quality review,\nhyperparameter tuning;
+
+stop
+
+@enduml

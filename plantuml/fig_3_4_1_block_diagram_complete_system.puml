@@ -1,0 +1,74 @@
+@startuml Fig_3_4_1_Block_Diagram_Complete_System
+title Fig 3.4.1: Block Diagram of Complete System
+
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+
+package "External" {
+  [Hugging Face Dataset\nroneneldan/TinyStories] as HF
+  [Operator /\nBrowser] as User
+}
+
+package "Data layer" {
+  [prepare_data.py] as Prep
+  folder "data/" {
+    file "train.bin" as TR
+    file "val.bin" as VA
+  }
+}
+
+package "Configuration" {
+  [config.py\nSLMConfig] as CFG
+}
+
+package "Model" {
+  [model.py\nSLM (Transformer)] as M
+}
+
+package "Training" {
+  [train.py] as TRN
+  folder "checkpoints/" {
+    file "best.pt" as BEST
+    file "latest.pt" as LAT
+  }
+  folder "logs/" {
+    file "train_log.csv" as LOG
+  }
+}
+
+package "Inference & UI" {
+  [generate.py\nCLI demo + interactive] as GEN
+  [server.py\nGradio :7860] as SRV
+  [tiktoken\nGPT-2 BPE] as TOK
+}
+
+HF --> Prep : load_dataset
+Prep --> TR : uint16 tokens
+Prep --> VA
+CFG ..> Prep
+CFG ..> TRN
+CFG ..> M
+CFG ..> GEN
+CFG ..> SRV
+
+TR --> TRN : memmap batches
+VA --> TRN
+M <-- TRN : forward / backward
+TRN --> BEST : save on best val
+TRN --> LAT : periodic snapshot
+TRN --> LOG
+
+BEST --> GEN : load checkpoint
+BEST --> SRV : load checkpoint
+TOK --> GEN : encode / decode
+TOK --> SRV
+M <-- GEN : generate()
+M <-- SRV : stream generate
+GEN --> User : text stories
+SRV --> User : chat UI
+
+note right of M
+  **SLM**: token + learned positional\nembeddings, N × (MHA + SwiGLU),\nRMSNorm, tied lm_head
+end note
+
+@enduml

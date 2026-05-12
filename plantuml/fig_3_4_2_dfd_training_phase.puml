@@ -1,0 +1,56 @@
+@startuml Fig_3_4_2_DFD_Training_Phase
+title Fig 3.4.2: Detailed Data Flow — Training Phase\n(Level-1 DFD, matches train.py + BinDataLoader + SLM)
+
+skinparam backgroundColor #FEFEFE
+
+package "Tokenizer artifacts" {
+  storage "train.bin /\nval.bin\n(uint16 IDs)" as BINS
+}
+
+package "Batch builder" {
+  rectangle "Random window sampler\n(B, T) indices" as SAMPLER
+}
+BINS --> SAMPLER : memmap read
+
+package "GPU tensors" {
+  entity "Input batch **x**\n(token IDs)" as X
+  entity "Target batch **y**\n(next-token IDs)" as Y
+}
+SAMPLER --> X
+SAMPLER --> Y
+
+package "Model forward" {
+  rectangle "**SLM.forward**\ntok_emb + pos_emb\n→ Transformer blocks\n→ **lm_head**" as FWD
+  entity "Logits\n(B, T, V)" as LOGITS
+}
+X --> FWD
+FWD --> LOGITS
+
+package "Loss" {
+  rectangle "**cross_entropy**\n(next-token prediction)" as CE
+  entity "Scalar **loss**" as LOSS
+}
+LOGITS --> CE
+Y --> CE
+CE --> LOSS
+
+package "Optimization" {
+  rectangle "**backward**\n(grad accum / clip)" as BW
+  entity "**AdamW**\nparameter updates" as OPT
+}
+LOSS --> BW
+BW --> OPT
+OPT --> FWD : updated weights
+
+package "Persistence" {
+  database "checkpoints/\n**best.pt**, **latest.pt**" as CKPT
+  database "logs/\n**train_log.csv**" as CSV
+}
+OPT ..> CKPT : periodic save
+LOSS ..> CSV : eval / train metrics
+
+note bottom of FWD
+  **Training** uses full-sequence\n**kv_cache = None**, causal SDPA
+end note
+
+@enduml

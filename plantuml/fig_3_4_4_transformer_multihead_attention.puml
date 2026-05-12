@@ -1,0 +1,34 @@
+@startuml Fig_3_4_4_Transformer_Multi_Head_Attention
+title Fig 3.4.4: Multi-Head Causal Self-Attention (CausalSelfAttention)\n— QKV fusion + scaled dot-product attention
+
+skinparam backgroundColor #FEFEFE
+skinparam rectangleBackgroundColor #F5F5FF
+
+rectangle "Input **x**\nshape (B, T, C)\nC = n_embd" as X
+
+rectangle "**Linear QKV**\nW_qkv : C → 3C" as QKV
+X --> QKV
+
+rectangle "Split & reshape\n**Q, K, V**\n(B, n_heads, T, head_dim)" as SPLIT
+QKV --> SPLIT
+
+rectangle "Optional **KV cache**\nconcat past K,V along T" as CACHE
+SPLIT --> CACHE
+
+rectangle "**scaled_dot_product_attention**\n(PyTorch SDPA / Flash)\n**is_causal** = True (train)\nFalse (cached decode)" as SDPA
+CACHE --> SDPA
+
+rectangle "Merge heads\n(B, T, C)" as MERGE
+SDPA --> MERGE
+
+rectangle "**Output proj**\nW_o : C → C\n+ dropout" as OUT
+MERGE --> OUT
+
+rectangle "Output **y**\n(B, T, C)" as Y
+OUT --> Y
+
+note bottom of SDPA
+  **head_dim** = C / n_heads\n**Attention(Q,K,V)** = softmax(QK^T / √d) V\nCausal mask prevents attending to future tokens\nwhen training on full sequences
+end note
+
+@enduml

@@ -1,0 +1,35 @@
+@startuml Fig_5_1_2_Sample_Generated_Stories
+title Fig 5.1.2: Sample Generated Stories (illustrative placeholders)\n— prompts mirror generate.py / server.py EXAMPLES
+
+skinparam backgroundColor #FEFEFE
+skinparam noteBorderColor #666666
+
+frame "Sample A" {
+  note as A1
+    **Prompt:** Once upon a time there was a little girl named Lily.
+    ----
+    **Generated story:**\n<replace with model output after training>\n(narrative continuation until <|endoftext|> or max tokens)
+  end note
+}
+
+frame "Sample B" {
+  note as B1
+    **Prompt:** One day a boy named Tom found a red ball.
+    ----
+    **Generated story:**\n<replace with model output>
+  end note
+}
+
+frame "Sample C" {
+  note as C1
+    **Prompt:** In the forest, there lived a friendly bear.
+    ----
+    **Generated story:**\n<replace with model output>
+  end note
+}
+
+note bottom
+  Run **python generate.py** or **python server.py**\nand paste outputs here for the final figure in the document.\nDecoding: GPT-2 BPE via **tiktoken**; sampling: temperature + top-k.
+end note
+
+@enduml

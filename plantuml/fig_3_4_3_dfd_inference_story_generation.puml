@@ -1,0 +1,50 @@
+@startuml Fig_3_4_3_DFD_Inference_Story_Generation
+title Fig 3.4.3: Data Flow — Inference / Story Generation Phase\n(generate.py / server.py + SLM.generate)
+
+skinparam backgroundColor #FEFEFE
+
+package "User / UI" {
+  actor "User prompt\n(text)" as U
+}
+
+package "Encoding" {
+  rectangle "**tiktoken**\nGPT-2 BPE" as ENC
+  entity "Prompt token IDs\n(≤ block_size)" as IDS
+}
+U --> ENC : encode_ordinary
+ENC --> IDS
+
+package "Checkpoint" {
+  storage "**best.pt**\nmodel_state + config" as CKPT
+  rectangle "**SLM** loaded\n**.eval()**" as MODEL
+}
+CKPT --> MODEL
+
+package "Autoregressive loop" {
+  rectangle "**Prime KV caches**\nfeed prompt tokens\none-by-one" as PRIME
+  rectangle "Repeat up to **max_new_tokens**" as LOOP
+  rectangle "**norm_f** + **lm_head**\n(last position logits)" as HEAD
+  rectangle "**temperature**, **top-k**\n**softmax** → **multinomial**" as SAMPLE
+  entity "Next token ID" as NEXT
+}
+IDS --> PRIME
+MODEL <-- PRIME : tok_emb + pos_emb\nper layer **kv_cache**
+PRIME --> LOOP
+LOOP --> HEAD
+HEAD --> SAMPLE
+SAMPLE --> NEXT
+NEXT --> LOOP : append; extend caches
+NEXT --> ENC : decode for display
+
+package "Stopping" {
+  rectangle "Stop on **eos_token**\nor context full" as STOP
+}
+NEXT --> STOP
+
+ENC --> U : full story string
+
+note right of PRIME
+  Inference uses **KV-cache**\nper layer; after prompt,\n**is_causal=False** for new query
+end note
+
+@enduml
