@@ -36,7 +36,6 @@ class RMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(dim))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # compute in float32 for numerical stability, then cast back
         dtype = x.dtype
         x_f = x.float()
         rms = torch.rsqrt(x_f.pow(2).mean(-1, keepdim=True) + self.eps)
@@ -57,7 +56,6 @@ class CausalSelfAttention(nn.Module):
         self.head_dim = cfg.n_embd // cfg.n_heads
         self.dropout = cfg.dropout
 
-        # fused QKV projection
         self.qkv = nn.Linear(cfg.n_embd, 3 * cfg.n_embd, bias=cfg.bias)
         self.proj = nn.Linear(cfg.n_embd, cfg.n_embd, bias=cfg.bias)
         self.resid_drop = nn.Dropout(cfg.dropout)
@@ -71,7 +69,6 @@ class CausalSelfAttention(nn.Module):
         qkv = self.qkv(x)
         q, k, v = qkv.split(self.n_embd, dim=2)
 
-        # reshape into heads: (B, n_heads, T, head_dim)
         q = q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         k = k.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         v = v.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
@@ -82,13 +79,10 @@ class CausalSelfAttention(nn.Module):
             k = torch.cat([past_k, k], dim=2)
             v = torch.cat([past_v, v], dim=2)
             new_cache = (k, v)
-            # For incremental decoding (T==1 typically), no causal mask needed:
-            # the new query can attend to all cached keys.
             is_causal = False
         else:
             is_causal = True
 
-        # PyTorch 2.x flash / mem-efficient attention
         y = F.scaled_dot_product_attention(
             q, k, v,
             attn_mask=None,
@@ -109,9 +103,6 @@ class SwiGLUMLP(nn.Module):
 
     def __init__(self, cfg: SLMConfig) -> None:
         super().__init__()
-        # Standard convention: hidden = 4 * n_embd, but with the gating split
-        # we use a slightly smaller multiplier so total params ~= GELU MLP.
-        # Choose hidden_dim = round(8/3 * n_embd) rounded to multiple of 64.
         hidden_dim = int(8 * cfg.n_embd / 3)
         hidden_dim = 64 * ((hidden_dim + 63) // 64)
 
@@ -166,18 +157,14 @@ class SLM(nn.Module):
         self.norm_f = RMSNorm(cfg.n_embd)
         self.lm_head = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
 
-        # Weight tying: share embedding matrix with the output head.
         self.lm_head.weight = self.tok_emb.weight
 
-        # Initialize parameters.
         self.apply(self._init_weights)
-        # Scale residual-projection inits by 1/sqrt(2*n_layers) (GPT-2 trick).
         scale = 1.0 / math.sqrt(2 * cfg.n_layers)
         for name, p in self.named_parameters():
             if name.endswith("proj.weight") or name.endswith("down.weight"):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02 * scale)
 
-    # ----- init ----------
     def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
@@ -186,11 +173,9 @@ class SLM(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    # ----- utilities ----------
     def get_num_params(self, non_embedding: bool = False) -> int:
         n = sum(p.numel() for p in self.parameters())
         if non_embedding:
-            # Subtract position embedding (token embedding is tied to lm_head, counted once).
             n -= self.pos_emb.weight.numel()
         return n
 
@@ -201,7 +186,6 @@ class SLM(nn.Module):
         betas: Tuple[float, float],
         device_type: str,
     ) -> torch.optim.Optimizer:
-        """AdamW with weight decay applied only to 2-D parameters."""
         decay_params, nodecay_params = [], []
         for _, p in self.named_parameters():
             if not p.requires_grad:
@@ -213,7 +197,6 @@ class SLM(nn.Module):
             {"params": nodecay_params, "weight_decay": 0.0},
         ]
 
-        # fused AdamW is faster on CUDA
         use_fused = device_type == "cuda"
         try:
             optimizer = torch.optim.AdamW(
@@ -223,7 +206,6 @@ class SLM(nn.Module):
             optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas)
         return optimizer
 
-    # ----- forward ----------
     def forward(
         self,
         idx: torch.Tensor,
@@ -250,12 +232,10 @@ class SLM(nn.Module):
                 ignore_index=-1,
             )
         else:
-            # Only compute logits for the last position to save memory at inference.
             logits = self.lm_head(x[:, -1:, :])
             loss = None
         return logits, loss
 
-    # ----- generation with KV cache ----------
     @torch.no_grad()
     def generate(
         self,
@@ -269,17 +249,12 @@ class SLM(nn.Module):
         self.eval()
         device = idx.device
 
-        # Crop the prompt if it exceeds the model's context window.
         if idx.size(1) > self.cfg.block_size:
             idx = idx[:, -self.cfg.block_size:]
 
         B, T = idx.shape
         generated = idx.clone()
 
-        # Prime caches by feeding the prompt token-by-token.
-        # Each attention layer returns its (K, V) only when given a non-None
-        # cache, so we seed with empty tensors of the right shape on the first
-        # token, then extend on subsequent tokens.
         head_dim = self.cfg.n_embd // self.cfg.n_heads
         empty = lambda: (
             torch.zeros(B, self.cfg.n_heads, 0, head_dim,
@@ -301,28 +276,25 @@ class SLM(nn.Module):
             caches = new_caches
 
         cur_pos = T
-        # ---- Generate new tokens one at a time ----
         for _ in range(max_new_tokens):
             if cur_pos >= self.cfg.block_size:
-                # Context full — stop generating to avoid position-embedding overflow.
                 break
 
             x = self.norm_f(x)
-            logits = self.lm_head(x[:, -1:, :]).squeeze(1)  # (B, vocab)
+            logits = self.lm_head(x[:, -1:, :]).squeeze(1)
             logits = logits / max(temperature, 1e-5)
 
             if top_k is not None and top_k > 0:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 logits[logits < v[:, [-1]]] = float("-inf")
 
-            probs = F.softmax(logits, dim=-1) 
-            next_tok = torch.multinomial(probs, num_samples=1)  # (B, 1)
+            probs = F.softmax(logits, dim=-1)
+            next_tok = torch.multinomial(probs, num_samples=1)
             generated = torch.cat([generated, next_tok], dim=1)
 
             if eos_token is not None and (next_tok == eos_token).all():
                 break
 
-            # Feed next token through the network using the cached K/V.
             pos_t = torch.tensor([[cur_pos]], dtype=torch.long, device=device).expand(B, 1)
             x = self.tok_emb(next_tok) + self.pos_emb(pos_t)
             new_caches = []

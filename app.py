@@ -23,11 +23,9 @@ def load_model():
     model.eval()
     return model, tiktoken.get_encoding("gpt2"), cfg
 
-# ── initialise prompt in session state ───────────────────────────────────────
 if "prompt" not in st.session_state:
     st.session_state.prompt = ""
 
-# ── UI ────────────────────────────────────────────────────────────────────────
 st.title("📖 SLM Story Generator")
 st.caption("A small language model trained on TinyStories — type a prompt and watch it write!")
 
@@ -42,7 +40,7 @@ examples = [
 cols = st.columns(2)
 for i, ex in enumerate(examples):
     if cols[i % 2].button(f'"{ex[:38]}…"', use_container_width=True, key=f"ex{i}"):
-        st.session_state.prompt = ex   # ← update BEFORE text_area renders
+        st.session_state.prompt = ex
 
 prompt = st.text_area("Your prompt", value=st.session_state.prompt, height=80, placeholder="Start your story here…")
 
