@@ -26,7 +26,7 @@ def load_model():
 if "prompt" not in st.session_state:
     st.session_state.prompt = ""
 
-st.title("📖 SLM Story Generator")
+st.title(" SLM Story Generator")
 st.caption("A small language model trained on TinyStories — type a prompt and watch it write!")
 
 st.markdown("### Try a prompt")
@@ -55,7 +55,7 @@ if st.button("✨ Generate story", type="primary", use_container_width=True):
             story = generate_story(model, enc, cfg, torch.device("cpu"), prompt.strip(),
                                    max_new_tokens=200, temperature=0.8, top_k=40)
         st.markdown("---")
-        st.markdown("### 📝 Generated story")
+        st.markdown("### Generated story")
         st.markdown(story)
         st.download_button("⬇️ Download as .txt", story, "story.txt")
 
