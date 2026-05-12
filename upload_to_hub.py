@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 
 # ── Change this to your HF username/repo ─────────────────────────────────────
-REPO_ID = "YOUR_USERNAME/slm-stories"
+REPO_ID = "hyrajratan/slm-stories"
 # ─────────────────────────────────────────────────────────────────────────────
 
 CHECKPOINT = Path("checkpoints/best.pt")
@@ -103,7 +103,7 @@ print(generate_story(model, enc, cfg, device, "Once upon a time there was a litt
 ```
 """
 
-Path("README.md").write_text(readme)
+Path("README.md").write_text(readme, encoding="utf-8")
 api.upload_file(
     path_or_fileobj="README.md",
     path_in_repo="README.md",
