@@ -10,7 +10,20 @@
       "Bash(python *)",
       "Bash(tee logs/train_run.log)",
       "Bash(nvidia-smi *)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "PowerShell(Remove-Item *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(timeout 30 bash *)",
+      "Bash(git remote *)",
+      "Bash(git config *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(streamlit --version)",
+      "Bash(streamlit deploy *)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)"
     ]
   }
 }

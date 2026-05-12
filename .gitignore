@@ -5,3 +5,7 @@ __pycache__/
 *.pyc
 *.pt
 *.bin
+checkpoints/
+data/
+*.pt
+*.bin
