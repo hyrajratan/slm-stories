@@ -44,7 +44,7 @@ for i, ex in enumerate(examples):
 
 prompt = st.text_area("Your prompt", value=st.session_state.prompt, height=80, placeholder="Start your story here…")
 
-if st.button("✨ Generate story", type="primary", use_container_width=True):
+if st.button("Generate story", type="primary", use_container_width=True):
     if not prompt.strip():
         st.warning("Please enter a prompt first.")
     else:
